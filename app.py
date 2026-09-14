@@ -9,8 +9,8 @@ app = Flask(__name__)
 # СПИСОК ВАШИХ ВИДЕО ВК (Вставляйте обычные полные ссылки из браузера!)
 MY_VIDEOS = [
     {"id": "1", "url": "https://vkvideo.ru/video-235867873_456239131", "title": "Быстро на пальцах про крипту"},
-    {"id": "2", "url": "-235867873_456239131", "title": "Второе видео ВК"},
-    {"id": "3", "url": "https://vk.com", "title": "Третье видео ВК"}
+    {"id": "2", "url": "https://vkvideo.ru/video-235867873_456239131": "Второе видео ВК"},
+    {"id": "3", "url": "https://vkvideo.ru/video-235867873_456239131"}
 ]
 
 cached_data = {v["id"]: {"views": 0, "growth_1hour": 0, "trending": False} for v in MY_VIDEOS}
