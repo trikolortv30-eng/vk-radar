@@ -1,59 +1,48 @@
 import os
 import requests
 import re
-from bs4 import BeautifulSoup
 from flask import Flask, jsonify, render_template_string
 
 app = Flask(__name__)
 
-# СПИСОК ВАШИХ ВИДЕО ВК (Вставляйте обычные полные ссылки из браузера!)
+# 🔑 СЮДА ВСТАВЬТЕ ВАШ СЕРВИСНЫЙ КЛЮЧ ИЗ НАСТРОЕК ПРИЛОЖЕНИЯ VK
+VK_SERVICE_TOKEN = "87db805c87db805c87db805c4584983e01887db87db805ced739b3542812221181b8430"
+
+# СПИСОК ВАШИХ ВИДЕО ВК (Сюда вставляйте ОБЫЧНЫЕ ПОЛНЫЕ ССЫЛКИ из адресной строки!)
 MY_VIDEOS = [
     {"id": "1", "url": "https://vkvideo.ru/video-235867873_456239131", "title": "Быстро на пальцах про крипту"},
-    {"id": "2", "url": "https://vkvideo.ru/video-235867873_456239131": "Второе видео ВК"},
-    {"id": "3", "url": "https://vkvideo.ru/video-235867873_456239131"}
+    {"id": "2", "url": "https://vkvideo.ru", "title": "Второе видео ВК"},
+    {"id": "3", "url": "https://vkvideo.ru", "title": "Третье видео ВК"}
 ]
 
 cached_data = {v["id"]: {"views": 0, "growth_1hour": 0, "trending": False} for v in MY_VIDEOS}
 history = {v["id"]: [] for v in MY_VIDEOS}
 current_check_index = 0
 
-def get_vk_views_smart(url):
-    if "vk.com" not in url and "vkvideo.ru" not in url:
+def get_vk_views_official(url):
+    if "video-" not in url and "video" not in url:
         return 0
     try:
-        # Умная трансформация ссылки в открытый мобильный формат
-        if "vkvideo.ru" in url:
-            url = url.replace("vkvideo.ru", "://vk.com")
-        elif "vk.com" in url and "://vk.com" not in url:
-            url = url.replace("vk.com", "://vk.com")
-            
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; SM-G960F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36',
-            'Accept-Language': 'ru-RU,ru;q=0.9'
-        }
-        r = requests.get(url, headers=headers, timeout=5)
-        html = r.text
+        # Автоматически вытаскиваем id видео из любой ссылки
+        match = re.search(r'video(-?\d+_\d+)', url)
+        if not match:
+            return 0
+        video_id = match.group(1)
         
-        # Ищем цифру в мета-тегах и в коде страницы
-        soup = BeautifulSoup(html, 'html.parser')
-        meta = soup.find('meta', {'property': 'ya:ovs:views_total'})
-        if meta and meta.get('content'):
-            return int(meta['content'])
+        # Легальный официальный запрос к ВК через API
+        api_url = f"https://vk.com{video_id}&access_token={VK_SERVICE_TOKEN}&v=5.131"
+        r = requests.get(api_url, timeout=4).json()
+        
+        # Если ВК отдает данные - забираем просмотры
+        if 'response' in r and r['response']['items']:
+            return int(r['response']['items'][0]['views'])
             
-        meta2 = soup.find('meta', {'property': 'video:views'})
-        if meta2 and meta2.get('content'):
-            return int(meta2['content'])
-
-        # Запасной поиск по тексту страницы
-        match = re.search(r'"viewsCount"\s*:\s*(\d+)', html)
-        if match:
-            return int(match.group(1))
+        # Запасной легальный метод, если первый ограничен приватностью
+        api_url_v2 = f"https://vk.com{video_id}&access_token={VK_SERVICE_TOKEN}&v=5.131"
+        r2 = requests.get(api_url_v2, timeout=4).json()
+        if 'response' in r2 and r2['response']:
+            return int(r2['response'][0].get('view_video', 0))
             
-        # Поиск по регулярному выражению для мобильной версии
-        match_mob = re.search(r'(\d+)\s+просмотр', html)
-        if match_mob:
-            return int(match_mob.group(1))
-
         return 0
     except:
         return 0
@@ -63,11 +52,10 @@ def get_stats():
     global current_check_index
     if not MY_VIDEOS: return jsonify([])
     
-    # Проверяем по 1 видео за 3 секунды, чтобы ВК не забанил за скорость
     video = MY_VIDEOS[current_check_index]
     v_id = video["id"]
     
-    real_views = get_vk_views_smart(video["url"])
+    real_views = get_vk_views_official(video["url"])
     
     if real_views > 0:
         if v_id not in history: history[v_id] = []
@@ -94,7 +82,7 @@ def get_stats():
         results.append({
             "id": vid,
             "title": v["title"],
-            "views": cached_data[vid]["views"] if cached_data[vid]["views"] > 0 else 0,
+            "views": cached_data[vid]["views"] if cached_data[vid]["views"] > 0 else "проверка...",
             "growth_1hour": cached_data[vid]["growth_1hour"],
             "trending": cached_data[vid]["trending"]
         })
@@ -125,7 +113,7 @@ HTML_PAGE = """
     </style>
 </head>
 <body>
-    <h1>🔷 VK VIDEO REALTIME TERMINAL // MOBILE BYPASS</h1>
+    <h1>🔷 VK VIDEO REALTIME TERMINAL // API SYSTEM</h1>
     <div class="table-header">
         <div>ID</div><div>НАЗВАНИЕ РОЛИКА</div><div>ВСЕГО</div><div>ЗА ЧАС</div><div>СТАТУС</div>
     </div>
@@ -148,19 +136,18 @@ HTML_PAGE = """
                     else row.classList.remove('trending');
                     
                     let hourText = video.growth_1hour > 0 ? '<span class="growth-num">+' + video.growth_1hour + '</span>' : '<span class="no-growth">0</span>';
-                    let viewsText = video.views > 0 ? video.views : '<span class="no-growth">...</span>';
                     
                     row.innerHTML = `
                         <div style="color: #343e4f;">#` + video.id + `</div>
                         <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px;">` + video.title + `</div>
-                        <div class="views-num">` + viewsText + `</div>
+                        <div class="views-num">` + video.views + `</div>
                         <div>` + hourText + `</div>
                         <div><span class="alert-tag">▲ BOOM</span></div>
                     `;
                 });
             } catch(e) { console.log(e); }
         }
-        setInterval(updateTerminal, 3000);
+        setInterval(updateTerminal, 2000);
         updateTerminal();
     </script>
 </body>
