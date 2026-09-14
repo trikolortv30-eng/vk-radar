@@ -13,7 +13,7 @@ VK_SERVICE_TOKEN = "87db805c87db805c87db805c4584983e01887db87db805ced739b3542812
 MY_VIDEOS = [
     {"id": "1", "vk_id": "-235867873_456239131", "title": "Ваше Название 1"},
     {"id": "2", "vk_id": "https://vkvideo.ru/video-235867873_456239131", "title": "Ваше Название 2"},
-    {"id": "3", "vk_id": "СЮДА_ВСТАВЛЯЕТЕ_ТРЕТИЙ_ID", "title": "Ваше Название 3"}
+    {"id": "3", "vk_id": "235867873_456239131", "title": "Ваше Название 3"}
 ]
 
 cached_data = {v["id"]: {"views": 0, "growth_1hour": 0, "trending": False} for v in MY_VIDEOS}
