@@ -19,33 +19,44 @@ cached_data = {v["id"]: {"views": 0, "growth_1hour": 0, "trending": False} for v
 history = {v["id"]: [] for v in MY_VIDEOS}
 current_check_index = 0
 
-def get_vk_views_official(url):
+def get_vk_views_ultimate(url):
     if "video-" not in url and "video" not in url:
         return 0
+    
+    # Извлекаем id видео (например, -235867873_456239131)
+    match = re.search(r'video(-?\d+_\d+)', url)
+    if not match:
+        return 0
+    video_id = match.group(1)
+    
+    # --- СПОСОБ 1: Легальный официальный API ---
     try:
-        # Автоматически вытаскиваем id видео из любой ссылки
-        match = re.search(r'video(-?\d+_\d+)', url)
-        if not match:
-            return 0
-        video_id = match.group(1)
-        
-        # Легальный официальный запрос к ВК через API
         api_url = f"https://vk.com{video_id}&access_token={VK_SERVICE_TOKEN}&v=5.131"
-        r = requests.get(api_url, timeout=4).json()
-        
-        # Если ВК отдает данные - забираем просмотры
+        r = requests.get(api_url, timeout=3).json()
         if 'response' in r and r['response']['items']:
-            return int(r['response']['items'][0]['views'])
-            
-        # Запасной легальный метод, если первый ограничен приватностью
-        api_url_v2 = f"https://vk.com{video_id}&access_token={VK_SERVICE_TOKEN}&v=5.131"
-        r2 = requests.get(api_url_v2, timeout=4).json()
-        if 'response' in r2 and r2['response']:
-            return int(r2['response'][0].get('view_video', 0))
-            
-        return 0
+            views = int(r['response']['items'][0].get('views', 0))
+            if views > 0: return views
     except:
-        return 0
+        pass
+
+    # --- СПОСОБ 2: Чтение через прямой открытый плеер ВК ---
+    try:
+        embed_url = f"https://vk.com{video_id.split('_')[0]}&id={video_id.split('_')[1]}"
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        html = requests.get(embed_url, headers=headers, timeout=3).text
+        
+        # Ищем точную цифру просмотров в коде плеера
+        match_views = re.search(r'"viewsCount"\s*:\s*(\d+)', html)
+        if match_views:
+            return int(match_views.group(1))
+            
+        match_text = re.search(r'(\d+)\s+просмотр', html)
+        if match_text:
+            return int(match_text.group(1))
+    except:
+        pass
+        
+    return 0
 
 @app.route('/api/stats')
 def get_stats():
@@ -55,7 +66,7 @@ def get_stats():
     video = MY_VIDEOS[current_check_index]
     v_id = video["id"]
     
-    real_views = get_vk_views_official(video["url"])
+    real_views = get_vk_views_ultimate(video["url"])
     
     if real_views > 0:
         if v_id not in history: history[v_id] = []
@@ -82,7 +93,7 @@ def get_stats():
         results.append({
             "id": vid,
             "title": v["title"],
-            "views": cached_data[vid]["views"] if cached_data[vid]["views"] > 0 else "проверка...",
+            "views": cached_data[vid]["views"] if cached_data[vid]["views"] > 0 else "загрузка...",
             "growth_1hour": cached_data[vid]["growth_1hour"],
             "trending": cached_data[vid]["trending"]
         })
@@ -113,7 +124,7 @@ HTML_PAGE = """
     </style>
 </head>
 <body>
-    <h1>🔷 VK VIDEO REALTIME TERMINAL // API SYSTEM</h1>
+    <h1>🔷 VK VIDEO REALTIME TERMINAL // API & EMBED HYBRID</h1>
     <div class="table-header">
         <div>ID</div><div>НАЗВАНИЕ РОЛИКА</div><div>ВСЕГО</div><div>ЗА ЧАС</div><div>СТАТУС</div>
     </div>
@@ -147,7 +158,7 @@ HTML_PAGE = """
                 });
             } catch(e) { console.log(e); }
         }
-        setInterval(updateTerminal, 2000);
+        setInterval(updateTerminal, 2500);
         updateTerminal();
     </script>
 </body>
