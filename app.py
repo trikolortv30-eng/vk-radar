@@ -21,15 +21,20 @@ def get_vk_views_smart(url):
     if "vk.com" not in url and "vkvideo.ru" not in url:
         return 0
     try:
-        # Притворяемся мобильным телефоном, чтобы ВК отдал страницу без авторизации
+        # Умная трансформация ссылки в открытый мобильный формат
+        if "vkvideo.ru" in url:
+            url = url.replace("vkvideo.ru", "://vk.com")
+        elif "vk.com" in url and "://vk.com" not in url:
+            url = url.replace("vk.com", "://vk.com")
+            
         headers = {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1',
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; SM-G960F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36',
             'Accept-Language': 'ru-RU,ru;q=0.9'
         }
-        r = requests.get(url, headers=headers, timeout=4)
+        r = requests.get(url, headers=headers, timeout=5)
         html = r.text
         
-        # Способ 1: Ищем в скрытых мета-тегах для поисковиков Яндекса/Гугла
+        # Ищем цифру в мета-тегах и в коде страницы
         soup = BeautifulSoup(html, 'html.parser')
         meta = soup.find('meta', {'property': 'ya:ovs:views_total'})
         if meta and meta.get('content'):
@@ -39,14 +44,15 @@ def get_vk_views_smart(url):
         if meta2 and meta2.get('content'):
             return int(meta2['content'])
 
-        # Способ 2: Ищем цифру просмотров в коде страницы через регулярное выражение
+        # Запасной поиск по тексту страницы
         match = re.search(r'"viewsCount"\s*:\s*(\d+)', html)
         if match:
             return int(match.group(1))
             
-        match2 = re.search(r'(\d+)\s+просмотр', html)
-        if match2:
-            return int(match2.group(1))
+        # Поиск по регулярному выражению для мобильной версии
+        match_mob = re.search(r'(\d+)\s+просмотр', html)
+        if match_mob:
+            return int(match_mob.group(1))
 
         return 0
     except:
