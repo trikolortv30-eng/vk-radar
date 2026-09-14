@@ -8,7 +8,7 @@ app = Flask(__name__)
 # 🔑 СЮДА ВСТАВЬТЕ ВАШ СЕРВИСНЫЙ КЛЮЧ ИЗ НАСТРОЕК ПРИЛОЖЕНИЯ VK
 VK_SERVICE_TOKEN = "87db805c87db805c87db805c4584983e01887db87db805ced739b3542812221181b8430"
 
-# СПИСОК ВАШИХ ВИДЕО ВК (Сюда вставляйте ОБЫЧНЫЕ ПОЛНЫЕ ССЫЛКИ из адресной строки!)
+# СПИСОК ВАШИХ ВИДЕО ВК (Вставляйте обычные полные ссылки из адресной строки!)
 MY_VIDEOS = [
     {"id": "1", "url": "https://vkvideo.ru/video-235867873_456239131", "title": "Быстро на пальцах про крипту"},
     {"id": "2", "url": "https://vkvideo.ru", "title": "Второе видео ВК"},
@@ -23,13 +23,12 @@ def get_vk_views_ultimate(url):
     if "video-" not in url and "video" not in url:
         return 0
     
-    # Извлекаем id видео (например, -235867873_456239131)
     match = re.search(r'video(-?\d+_\d+)', url)
     if not match:
         return 0
     video_id = match.group(1)
     
-    # --- СПОСОБ 1: Легальный официальный API ---
+    # Способ 1: Прямой официальный API-запрос
     try:
         api_url = f"https://vk.com{video_id}&access_token={VK_SERVICE_TOKEN}&v=5.131"
         r = requests.get(api_url, timeout=3).json()
@@ -39,13 +38,16 @@ def get_vk_views_ultimate(url):
     except:
         pass
 
-    # --- СПОСОБ 2: Чтение через прямой открытый плеер ВК ---
+    # Способ 2: Запасной обход через открытый плеер-виджет
     try:
-        embed_url = f"https://vk.com{video_id.split('_')[0]}&id={video_id.split('_')[1]}"
+        parts = video_id.split('_')
+        owner_id = parts[0]
+        vid_id = parts[1]
+        
+        embed_url = f"https://vk.com{owner_id}&id={vid_id}"
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         html = requests.get(embed_url, headers=headers, timeout=3).text
         
-        # Ищем точную цифру просмотров в коде плеера
         match_views = re.search(r'"viewsCount"\s*:\s*(\d+)', html)
         if match_views:
             return int(match_views.group(1))
@@ -124,7 +126,7 @@ HTML_PAGE = """
     </style>
 </head>
 <body>
-    <h1>🔷 VK VIDEO REALTIME TERMINAL // API & EMBED HYBRID</h1>
+    <h1>🔷 VK VIDEO REALTIME TERMINAL // API SYSTEM</h1>
     <div class="table-header">
         <div>ID</div><div>НАЗВАНИЕ РОЛИКА</div><div>ВСЕГО</div><div>ЗА ЧАС</div><div>СТАТУС</div>
     </div>
@@ -158,7 +160,7 @@ HTML_PAGE = """
                 });
             } catch(e) { console.log(e); }
         }
-        setInterval(updateTerminal, 2500);
+        setInterval(updateTerminal, 2000);
         updateTerminal();
     </script>
 </body>
