@@ -11,7 +11,7 @@ VK_SERVICE_TOKEN = "87db805c87db805c87db805c4584983e01887db87db805ced739b3542812
 # СПИСОК ВАШИХ ВИДЕО ВК (Вставляйте обычные полные ссылки из адресной строки!)
 MY_VIDEOS = [
     {"id": "1", "url": "https://vkvideo.ru/video-235867873_456239131", "title": "Быстро на пальцах про крипту"},
-    {"id": "2", "url": "https://vkvideo.ru", "title": "Второе видео ВК"},
+    {"id": "2", "url": "https://vkvideo.ru/clip-235867873_456239132", "title": "Второе видео ВК"},
     {"id": "3", "url": "https://vkvideo.ru", "title": "Третье видео ВК"}
 ]
 
