@@ -5,14 +5,14 @@ from flask import Flask, jsonify, render_template_string
 
 app = Flask(__name__)
 
-# 🔑 СЮДА ВСТАВЬТЕ ВАШ СЕРВИСНЫЙ КЛЮЧ ИЗ НАСТРОЕК ПРИЛОЖЕНИЯ VK
+# 🔑 ВСТАВЬТЕ СЮДА ВАШ СЕРВИСНЫЙ КЛЮЧ ИЗ НАСТРОЕК ПРИЛОЖЕНИЯ VK
 VK_SERVICE_TOKEN = "87db805c87db805c87db805c4584983e01887db87db805ced739b3542812221181b8430"
 
 # СПИСОК ВАШИХ ВИДЕО ВК (Вставляйте обычные полные ссылки из адресной строки!)
 MY_VIDEOS = [
     {"id": "1", "url": "https://vkvideo.ru/video-235867873_456239131", "title": "Быстро на пальцах про крипту"},
-    {"id": "2", "url": "https://vkvideo.ru/clip-235867873_456239132", "title": "Второе видео ВК"},
-    {"id": "3", "url": "https://vkvideo.ru/video-235353422_456239076", "title": "Третье видео ВК"}
+    {"id": "2", "url": "https://vkvideo.ru/video-235867873_456239131", "title": "Второе видео ВК"},
+    {"id": "3", "url": "https://vkvideo.ru/video-235867873_456239131", "title": "Третье видео ВК"}
 ]
 
 cached_data = {v["id"]: {"views": 0, "growth_1hour": 0, "trending": False} for v in MY_VIDEOS}
@@ -26,9 +26,14 @@ def get_vk_views_ultimate(url):
     match = re.search(r'video(-?\d+_\d+)', url)
     if not match:
         return 0
-    video_id = match.group(1)
+    video_id = match.group(1) # Получаем формат ownerId_videoId
     
-    # Способ 1: Прямой официальный API-запрос
+    # Разделяем на ID владельца и ID видео для альтернативных методов
+    parts = video_id.split('_')
+    owner_id = parts[0]
+    vid_id = parts[1]
+    
+    # --- МЕТОД 1: Стандартный запрос видео через API ---
     try:
         api_url = f"https://vk.com{video_id}&access_token={VK_SERVICE_TOKEN}&v=5.131"
         r = requests.get(api_url, timeout=3).json()
@@ -38,23 +43,26 @@ def get_vk_views_ultimate(url):
     except:
         pass
 
-    # Способ 2: Запасной обход через открытый плеер-виджет
+    # --- МЕТОД 2: Если видео в группе, запрашиваем через стену сообщества ---
     try:
-        parts = video_id.split('_')
-        owner_id = parts[0]
-        vid_id = parts[1]
-        
-        embed_url = f"https://vk.com{owner_id}&id={vid_id}"
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        html = requests.get(embed_url, headers=headers, timeout=3).text
-        
-        match_views = re.search(r'"viewsCount"\s*:\s*(\d+)', html)
-        if match_views:
-            return int(match_views.group(1))
-            
-        match_text = re.search(r'(\d+)\s+просмотр', html)
-        if match_text:
-            return int(match_text.group(1))
+        # Убираем минус из ID владельца, если он есть, для запроса к стене
+        g_id = owner_id.replace('-', '')
+        api_url_wall = f"https://vk.com{g_id}_{vid_id}&access_token={VK_SERVICE_TOKEN}&v=5.131"
+        r_wall = requests.get(api_url_wall, timeout=3).json()
+        if 'response' in r_wall and r_wall['response']:
+            # Ищем блок просмотров самого поста, где прикреплено видео
+            views = int(r_wall['response'][0].get('views', {}).get('count', 0))
+            if views > 0: return views
+    except:
+        pass
+
+    # --- МЕТОД 3: Запасной официальный сбор статистики видео ---
+    try:
+        api_url_stats = f"https://vk.com{owner_id}&video_id={vid_id}&access_token={VK_SERVICE_TOKEN}&v=5.131"
+        r_stats = requests.get(api_url_stats, timeout=3).json()
+        if 'response' in r_stats and r_stats['response']:
+            views = int(r_stats['response'][0].get('view_video', 0))
+            if views > 0: return views
     except:
         pass
         
@@ -92,10 +100,17 @@ def get_stats():
     results = []
     for v in MY_VIDEOS:
         vid = v["id"]
+        # Превращаем число просмотров в красивый формат (например, 15300 -> 15.3k)
+        raw_views = cached_data[vid]["views"]
+        if isinstance(raw_views, int) and raw_views > 1000:
+            formatted_views = f"{raw_views/1000:.1f}k"
+        else:
+            formatted_views = raw_views if raw_views > 0 else "загрузка..."
+
         results.append({
             "id": vid,
             "title": v["title"],
-            "views": cached_data[vid]["views"] if cached_data[vid]["views"] > 0 else "загрузка...",
+            "views": formatted_views,
             "growth_1hour": cached_data[vid]["growth_1hour"],
             "trending": cached_data[vid]["trending"]
         })
@@ -126,7 +141,7 @@ HTML_PAGE = """
     </style>
 </head>
 <body>
-    <h1>🔷 VK VIDEO REALTIME TERMINAL // API SYSTEM</h1>
+    <h1>🔷 VK VIDEO REALTIME TERMINAL // MULTI-API SYSTEM</h1>
     <div class="table-header">
         <div>ID</div><div>НАЗВАНИЕ РОЛИКА</div><div>ВСЕГО</div><div>ЗА ЧАС</div><div>СТАТУС</div>
     </div>
